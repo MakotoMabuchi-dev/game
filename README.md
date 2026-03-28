@@ -1,104 +1,104 @@
 # RP2350 Touch LCD Game Collection
 
-Game collection for the Waveshare `RP2350-Touch-LCD-1.85C`.
+Waveshare `RP2350-Touch-LCD-1.85C` 向けのゲーム集プロジェクトです。
 
-This project currently includes:
+現在は以下を含みます。
 
-- A launcher screen with game selection
-- `FAST`: reaction game with countdown, random red flash, touch timing, and best score
-- `HIT20`: 20-tap speed game with best score
-- Shared result screen UI
-- Touch input, LCD output, and short WAV playback support
+- ゲーム選択用のランチャー画面
+- `FAST`: カウントダウン後にランダムで赤く光り、反応速度を測るゲーム
+- `HIT20`: 20 回タップするまでの時間を測るゲーム
+- 共通の結果表示 UI
+- タッチ入力、LCD 表示、短い WAV 音声の再生機能
 
-## Hardware
+## 対応ハードウェア
 
-- Board: Waveshare `RP2350-Touch-LCD-1.85C`
-- MCU target: `pico2` / `rp2350-arm-s`
-- Display: ST77916
-- Touch: CST816
-- Audio codec: ES8311
+- ボード: Waveshare `RP2350-Touch-LCD-1.85C`
+- MCU ターゲット: `pico2` / `rp2350-arm-s`
+- ディスプレイ: ST77916
+- タッチ: CST816
+- オーディオ codec: ES8311
 
-## Project Layout
+## ディレクトリ構成
 
 ```text
 .
-├── launcher.c            # app entry point and game selection flow
-├── app.c / app.h         # shared UI, touch, audio, formatting helpers
+├── launcher.c            # アプリの開始点とゲーム選択処理
+├── app.c / app.h         # 共通 UI、タッチ、音声、表示補助
 ├── games/
-│   ├── games.c           # game registry
-│   ├── 1_push_fast/      # reaction game
-│   └── 2_hit20/          # 20-tap game
+│   ├── games.c           # ゲーム一覧の登録
+│   ├── 1_push_fast/      # 反応速度ゲーム
+│   └── 2_hit20/          # 20 回タップゲーム
 ├── assets/
-│   ├── 1_push_fast/      # per-game audio assets
-│   └── ui/               # shared SVG icons and generated icon header
-├── bsp/                  # LCD, touch, audio, I2C, PIO support code
-└── tools/                # asset conversion helpers
+│   ├── 1_push_fast/      # ゲームごとの音声アセット
+│   └── ui/               # 共通 SVG アイコンと生成済みヘッダ
+├── bsp/                  # LCD、タッチ、音声、I2C、PIO まわり
+└── tools/                # アセット変換用スクリプト
 ```
 
-## Build
+## ビルド
 
-Requirements:
+必要なもの:
 
 - Raspberry Pi Pico SDK
 - CMake
-- A working ARM embedded toolchain
+- ARM 向け組み込みツールチェーン
 - `picotool`
 
-First configure:
+最初に configure:
 
 ```sh
 cmake -S . -B build
 ```
 
-Build:
+ビルド:
 
 ```sh
 cmake --build build
 ```
 
-The output ELF is:
+生成される ELF:
 
 ```sh
 build/test.elf
 ```
 
-## Flash
+## 書き込み
 
-Example with `picotool`:
+`picotool` を使う場合の例:
 
 ```sh
 picotool load build/test.elf -fx
 ```
 
-## Current Game Flow
+## 現在のゲームの流れ
 
-On boot, the launcher shows `SELECT`.
+起動するとランチャーに `SELECT` が表示されます。
 
-- Tap left edge: previous game
-- Tap right edge: next game
-- Tap center: start selected game
+- 画面左端をタッチ: 前のゲーム
+- 画面右端をタッチ: 次のゲーム
+- 画面中央をタッチ: 選択中のゲームを開始
 
-Each game uses the same result screen layout:
+各ゲームは共通の結果画面を使っています。
 
-- Game title at the top
-- Current record in the center
-- Best record below it
-- Replay icon on the left
-- Finish icon on the right
+- 上部にゲーム名
+- 中央に今回の記録
+- その下に過去最高記録
+- 左にリプレイアイコン
+- 右に終了アイコン
 
-## Adding a New Game
+## 新しいゲームの追加方法
 
-1. Create a new folder under `games/`, for example `games/3_new_game/`
-2. Add `3_new_game.c` and `3_new_game.h`
-3. Register it in `games/games.c`
-4. Add the source file to `CMakeLists.txt`
-5. If needed, add per-game assets under `assets/3_new_game/`
+1. `games/` の下に新しいフォルダを作る。例: `games/3_new_game/`
+2. `3_new_game.c` と `3_new_game.h` を追加する
+3. `games/games.c` に登録する
+4. `CMakeLists.txt` にソースを追加する
+5. 必要なら `assets/3_new_game/` のようにゲーム専用アセットを追加する
 
-The shared launcher and result screen are designed so additional games can be added without changing the overall app structure.
+ランチャーや結果画面は共通化してあるため、全体構成を大きく変えずにゲームを増やせます。
 
-## Assets
+## アセット
 
-UI icons are stored as SVG files in `assets/ui/` and converted into a bitmap header:
+UI アイコンは `assets/ui/` に SVG で置き、ビットマップ用ヘッダへ変換しています。
 
 ```sh
 python3 tools/svg_icon_to_header.py assets/ui/result_icons.h \
@@ -107,9 +107,9 @@ python3 tools/svg_icon_to_header.py assets/ui/result_icons.h \
   assets/ui/best_crown.svg
 ```
 
-`1_push_fast` also includes a generated WAV header for embedded playback.
+`1_push_fast` では、埋め込み再生用の WAV ヘッダも生成して使っています。
 
-## Notes
+## メモ
 
-- RAM is limited on RP2350, so the project keeps a single shared framebuffer.
-- Build artifacts are ignored by Git via `.gitignore`.
+- RP2350 の RAM には制約があるため、フレームバッファは 1 枚だけを共用しています。
+- ビルド生成物は `.gitignore` で除外しています。
