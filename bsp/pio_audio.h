@@ -103,6 +103,7 @@ void mclk_pio_init();
 void set_mclk_frequency(uint32_t frequency);
 int32_t* data_treating(const int16_t *audio , uint32_t len) ;
 void audio_out(int32_t *samples, int32_t len);
+void audio_reset_output(void);
 void audio_out_pcm16(const int16_t *samples, int32_t len);
 
 #endif //_PICO_AUDIO_PIO_H

@@ -31,7 +31,7 @@ void app_init(void);
 void app_fill_screen(uint16_t color);
 void app_present_frame(void);
 void app_draw_text_centered(int center_x, int y, const char *text, int scale, uint16_t color);
-void app_draw_menu_screen(const char *title, const char *item_name);
+void app_draw_menu_screen(const char *title, const char *item_name, const char *best_record);
 void app_draw_result_screen(const app_result_view_t *view);
 void app_draw_black_message(const char *line1, const char *line2);
 bool app_poll_touch_event(touch_event_t *event);

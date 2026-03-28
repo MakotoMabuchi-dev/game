@@ -8,6 +8,7 @@ int main(void)
     size_t selected = 0;
     size_t game_count = 0;
     const game_descriptor_t *games = games_get_all(&game_count);
+    char best_record[16];
 
     stdio_init_all();
     sleep_ms(2000);
@@ -16,18 +17,21 @@ int main(void)
     while (true) {
         touch_event_t event;
 
-        app_draw_menu_screen("SELECT", games[selected].name);
+        games[selected].get_best_record(best_record, sizeof(best_record));
+        app_draw_menu_screen("SELECT", games[selected].name, best_record);
         app_wait_for_touch_release();
 
         while (true) {
             if (app_poll_touch_event(&event)) {
                 if (app_is_left_edge_touch(event.x)) {
                     selected = (selected + game_count - 1) % game_count;
-                    app_draw_menu_screen("SELECT", games[selected].name);
+                    games[selected].get_best_record(best_record, sizeof(best_record));
+                    app_draw_menu_screen("SELECT", games[selected].name, best_record);
                     app_wait_for_touch_release();
                 } else if (app_is_right_edge_touch(event.x)) {
                     selected = (selected + 1) % game_count;
-                    app_draw_menu_screen("SELECT", games[selected].name);
+                    games[selected].get_best_record(best_record, sizeof(best_record));
+                    app_draw_menu_screen("SELECT", games[selected].name, best_record);
                     app_wait_for_touch_release();
                 } else {
                     break;

@@ -4,10 +4,20 @@
 #include "assets/1_push_fast/1_push_fast_wav.h"
 #include "1_push_fast.h"
 
+static uint32_t best_hundredths = 0;
+
+void game_1_push_fast_get_best_record(char *buffer, size_t buffer_size)
+{
+    if (best_hundredths == 0) {
+        snprintf(buffer, buffer_size, "--.--");
+        return;
+    }
+
+    app_format_hundredths(buffer, buffer_size, best_hundredths);
+}
+
 void run_game_1_push_fast(game_run_context_t *context)
 {
-    static uint32_t best_hundredths = 0;
-
     while (true) {
         bool is_first_start = game_consume_first_start(context);
         touch_event_t event;

@@ -36,6 +36,7 @@ static bool audio_ready = false;
 static const glyph_t k_font[] = {
     {' ', {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}},
     {'.', {0x00, 0x00, 0x00, 0x00, 0x00, 0x0C, 0x0C}},
+    {'-', {0x00, 0x00, 0x00, 0x1F, 0x00, 0x00, 0x00}},
     {'_', {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1F}},
     {'0', {0x0E, 0x11, 0x13, 0x15, 0x19, 0x11, 0x0E}},
     {'1', {0x04, 0x0C, 0x04, 0x04, 0x04, 0x04, 0x0E}},
@@ -245,6 +246,7 @@ static void init_audio(void)
     es8311_init(pico_audio);
     es8311_sample_frequency_config(pico_audio.mclk_freq, pico_audio.sample_freq);
     es8311_voice_volume_set(pico_audio.volume);
+    es8311_voice_mute(false);
     audio_ready = true;
 }
 
@@ -329,15 +331,12 @@ static void draw_result_button(int x, int y, int w, int h, post_game_action_t ac
     }
 }
 
-static void draw_best_record_row(const char *best_record)
+static void draw_crowned_record_row(const char *record, int center_y, int text_scale, int icon_gap)
 {
-    int icon_gap = 12;
-    int text_scale = 4;
-    int group_width = best_crown_icon_width + icon_gap + text_width(best_record, text_scale);
+    int group_width = best_crown_icon_width + icon_gap + text_width(record, text_scale);
     int group_left = (LCD_WIDTH - group_width) / 2;
     int icon_center_x = group_left + (best_crown_icon_width / 2);
-    int text_center_x = group_left + best_crown_icon_width + icon_gap + (text_width(best_record, text_scale) / 2);
-    int center_y = 196;
+    int text_center_x = group_left + best_crown_icon_width + icon_gap + (text_width(record, text_scale) / 2);
 
     draw_bitmap_mask_centered(icon_center_x, center_y,
                               best_crown_icon_width,
@@ -346,7 +345,7 @@ static void draw_best_record_row(const char *best_record)
                               COLOR_WHITE);
     app_draw_text_centered(text_center_x,
                            center_y - ((7 * text_scale) / 2),
-                           best_record,
+                           record,
                            text_scale,
                            COLOR_WHITE);
 }
@@ -357,7 +356,7 @@ static bool point_in_rect(uint16_t x, uint16_t y, int rect_x, int rect_y, int re
            y >= rect_y && y < (rect_y + rect_h);
 }
 
-void app_draw_menu_screen(const char *title, const char *item_name)
+void app_draw_menu_screen(const char *title, const char *item_name, const char *best_record)
 {
     int title_scale = 4;
     int item_scale = fit_text_scale(item_name, 8, 3, LCD_WIDTH - 100);
@@ -372,6 +371,7 @@ void app_draw_menu_screen(const char *title, const char *item_name)
                            item_name,
                            item_scale,
                            COLOR_WHITE);
+    draw_crowned_record_row(best_record, 248, 3, 10);
     app_present_frame();
 }
 
@@ -382,7 +382,7 @@ void app_draw_result_screen(const app_result_view_t *view)
     app_fill_screen(COLOR_BLACK);
     app_draw_text_centered(LCD_WIDTH / 2, 28, view->game_name, title_scale, COLOR_WHITE);
     app_draw_text_centered(LCD_WIDTH / 2, 102, view->current_record, 6, COLOR_WHITE);
-    draw_best_record_row(view->best_record);
+    draw_crowned_record_row(view->best_record, 196, 4, 12);
     draw_result_button(RESULT_CONTINUE_X, RESULT_BUTTON_Y,
                        RESULT_BUTTON_W, RESULT_BUTTON_H, POST_ACTION_REPLAY);
     draw_result_button(RESULT_FINISH_X, RESULT_BUTTON_Y,
@@ -476,6 +476,9 @@ void app_play_wav(const unsigned char *wav, uint32_t wav_len)
     if (!audio_ready || !get_embedded_wav_pcm(wav, wav_len, &pcm_bytes, &pcm_len_bytes)) {
         return;
     }
+
+    es8311_voice_mute(false);
+    audio_reset_output();
 
     audio_out_pcm16((const int16_t *)pcm_bytes, (int32_t)(pcm_len_bytes / 2));
 }

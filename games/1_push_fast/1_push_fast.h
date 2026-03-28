@@ -4,5 +4,6 @@
 #include "games.h"
 
 void run_game_1_push_fast(game_run_context_t *context);
+void game_1_push_fast_get_best_record(char *buffer, size_t buffer_size);
 
 #endif

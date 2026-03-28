@@ -11,6 +11,8 @@ typedef struct {
     bool is_first_start;
 } game_run_context_t;
 
+typedef void (*game_best_record_fn_t)(char *buffer, size_t buffer_size);
+
 static inline bool game_consume_first_start(game_run_context_t *context)
 {
     bool is_first_start = context->is_first_start;
@@ -21,6 +23,7 @@ static inline bool game_consume_first_start(game_run_context_t *context)
 typedef struct {
     const char *name;
     void (*run)(game_run_context_t *context);
+    game_best_record_fn_t get_best_record;
 } game_descriptor_t;
 
 const game_descriptor_t *games_get_all(size_t *count);

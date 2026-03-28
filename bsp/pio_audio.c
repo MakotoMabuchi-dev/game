@@ -37,8 +37,7 @@
 #include "pio_audio.pio.h"
 
 static uint audio_pio_offset = 0;
-static void audio_out_prepare(void);
-static void audio_out_finish(void);
+static uint32_t audio_frame_time_us(void);
 
 /******************************************************************************
 function: Mclk frequency modification
@@ -64,14 +63,8 @@ int32_t* data_treating(const int16_t *audio , uint32_t len)
 	int32_t *samples = (int32_t *)calloc(len, sizeof(int32_t));
 	for(uint32_t i = 0; i < len; i++)
 	{
-		if(pico_audio.channel_count == 1)
-		{
-			samples[i] = audio[i] * 65536;
-		}
-		else
-		{
-			samples[i] = audio[i] * 65536 + audio[i];
-		}
+        uint16_t sample_bits = (uint16_t)audio[i];
+        samples[i] = ((int32_t)sample_bits << 16) | sample_bits;
 	}
 	return samples;
 }
@@ -84,59 +77,48 @@ parameter:
 ******************************************************************************/	
 void audio_out(int32_t *samples, int32_t len) 
 {
-    audio_out_prepare();
-
     for (int32_t i = 0; i < len; i++) {
         pio_sm_put_blocking(pico_audio.pio_2, pico_audio.sm_dout, (uint32_t)samples[i]);
     }
-
-    audio_out_finish();
 }
 
-static void audio_out_prepare(void)
+void audio_reset_output(void)
 {
     pio_sm_set_enabled(pico_audio.pio_2, pico_audio.sm_dout, false);
     pio_sm_clear_fifos(pico_audio.pio_2, pico_audio.sm_dout);
 
-    // Reinitialize the output SM before every playback so LRCLK/BCLK sync and
-    // the TX FIFO always start from a clean state.
+    // Restore the output SM to the same state as a fresh boot so every playback
+    // starts from a consistent LRCLK/BCLK alignment point.
     audio_pio_program_init(pico_audio.pio_2,
                            pico_audio.sm_dout,
                            audio_pio_offset,
                            pico_audio.audio_dout,
                            pico_audio.audio_lrclk);
     pio_sm_set_clkdiv(pico_audio.pio_2, pico_audio.sm_dout, 1.0f);
-
-    // The PIO program consumes one word before the first audible frame.
-    pio_sm_put_blocking(pico_audio.pio_2, pico_audio.sm_dout, 0u);
     pio_sm_set_enabled(pico_audio.pio_2, pico_audio.sm_dout, true);
+
+    // The PIO program consumes one word before the first audible stereo frame.
+    pio_sm_put_blocking(pico_audio.pio_2, pico_audio.sm_dout, 0u);
 }
 
-static void audio_out_finish(void)
+static uint32_t audio_frame_time_us(void)
 {
-    uint32_t settle_us = (2000000u + pico_audio.sample_freq - 1u) / pico_audio.sample_freq;
-
-    // End on silence and wait until the FIFO drains so the next playback starts cleanly.
-    pio_sm_put_blocking(pico_audio.pio_2, pico_audio.sm_dout, 0u);
-    while (!pio_sm_is_tx_fifo_empty(pico_audio.pio_2, pico_audio.sm_dout)) {
-        tight_loop_contents();
-    }
-    sleep_us(settle_us);
+    return (1000000u + pico_audio.sample_freq - 1u) / pico_audio.sample_freq;
 }
 
 void audio_out_pcm16(const int16_t *samples, int32_t len)
 {
-    audio_out_prepare();
-
     for (int32_t i = 0; i < len; i++) {
-        int32_t sample = (int32_t)samples[i] * 65536;
-        if (pico_audio.channel_count != 1) {
-            sample += (uint16_t)samples[i];
-        }
+        uint16_t sample_bits = (uint16_t)samples[i];
+        int32_t sample = ((int32_t)sample_bits << 16) | sample_bits;
         pio_sm_put_blocking(pico_audio.pio_2, pico_audio.sm_dout, sample);
     }
 
-    audio_out_finish();
+    pio_sm_put_blocking(pico_audio.pio_2, pico_audio.sm_dout, 0u);
+    while (!pio_sm_is_tx_fifo_empty(pico_audio.pio_2, pico_audio.sm_dout)) {
+        tight_loop_contents();
+    }
+    sleep_us(audio_frame_time_us() * 2u);
 }
 
 /******************************************************************************
