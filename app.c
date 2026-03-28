@@ -77,6 +77,19 @@ static const bsp_display_area_t full_area = {
 static bsp_display_interface_t *display = NULL;
 static bsp_touch_interface_t *touch = NULL;
 
+static bool prepare_audio_playback(void)
+{
+    if (!audio_ready) {
+        return false;
+    }
+
+    // Keep the codec/output recovery in one place so every future playback path
+    // goes through the same known-good setup.
+    es8311_voice_mute(false);
+    audio_reset_output();
+    return true;
+}
+
 static void flush_done(void)
 {
     flush_done_flag = true;
@@ -477,10 +490,17 @@ void app_play_wav(const unsigned char *wav, uint32_t wav_len)
         return;
     }
 
-    es8311_voice_mute(false);
-    audio_reset_output();
+    app_play_pcm16_mono((const int16_t *)pcm_bytes, pcm_len_bytes / 2);
+}
 
-    audio_out_pcm16((const int16_t *)pcm_bytes, (int32_t)(pcm_len_bytes / 2));
+bool app_play_pcm16_mono(const int16_t *samples, uint32_t sample_count)
+{
+    if (samples == NULL || sample_count == 0 || !prepare_audio_playback()) {
+        return false;
+    }
+
+    audio_out_pcm16(samples, (int32_t)sample_count);
+    return true;
 }
 
 void app_format_hundredths(char *buffer, size_t buffer_size, uint32_t hundredths)

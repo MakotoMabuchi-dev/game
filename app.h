@@ -39,6 +39,7 @@ void app_wait_for_touch_release(void);
 bool app_is_left_edge_touch(uint16_t x);
 bool app_is_right_edge_touch(uint16_t x);
 post_game_action_t app_wait_post_game_action(void);
+bool app_play_pcm16_mono(const int16_t *samples, uint32_t sample_count);
 void app_play_wav(const unsigned char *wav, uint32_t wav_len);
 void app_format_hundredths(char *buffer, size_t buffer_size, uint32_t hundredths);
 void app_update_best_hundredths(uint32_t current_hundredths, uint32_t *best_hundredths);
