@@ -177,10 +177,10 @@ static void draw_right_triangle(int center_x, int center_y, int size, uint16_t c
     }
 }
 
-static void draw_bitmap_mask_centered(int center_x, int center_y,
-                                      int width, int height,
-                                      const char *const *rows,
-                                      uint16_t color)
+void app_draw_bitmap_mask_centered(int center_x, int center_y,
+                                   int width, int height,
+                                   const char *const *rows,
+                                   uint16_t color)
 {
     int origin_x = center_x - (width / 2);
     int origin_y = center_y - (height / 2);
@@ -329,18 +329,18 @@ static void draw_result_button(int x, int y, int w, int h, post_game_action_t ac
 
     if (action == POST_ACTION_REPLAY) {
         center_x += RESULT_ICON_INSET;
-        draw_bitmap_mask_centered(center_x, center_y,
-                                  continue_replay_icon_width,
-                                  continue_replay_icon_height,
-                                  continue_replay_icon_rows,
-                                  COLOR_WHITE);
+        app_draw_bitmap_mask_centered(center_x, center_y,
+                                      continue_replay_icon_width,
+                                      continue_replay_icon_height,
+                                      continue_replay_icon_rows,
+                                      COLOR_WHITE);
     } else {
         center_x -= RESULT_ICON_INSET;
-        draw_bitmap_mask_centered(center_x, center_y,
-                                  finish_logout_icon_width,
-                                  finish_logout_icon_height,
-                                  finish_logout_icon_rows,
-                                  COLOR_WHITE);
+        app_draw_bitmap_mask_centered(center_x, center_y,
+                                      finish_logout_icon_width,
+                                      finish_logout_icon_height,
+                                      finish_logout_icon_rows,
+                                      COLOR_WHITE);
     }
 }
 
@@ -351,11 +351,11 @@ static void draw_crowned_record_row(const char *record, int center_y, int text_s
     int icon_center_x = group_left + (best_crown_icon_width / 2);
     int text_center_x = group_left + best_crown_icon_width + icon_gap + (text_width(record, text_scale) / 2);
 
-    draw_bitmap_mask_centered(icon_center_x, center_y,
-                              best_crown_icon_width,
-                              best_crown_icon_height,
-                              best_crown_icon_rows,
-                              COLOR_WHITE);
+    app_draw_bitmap_mask_centered(icon_center_x, center_y,
+                                  best_crown_icon_width,
+                                  best_crown_icon_height,
+                                  best_crown_icon_rows,
+                                  COLOR_WHITE);
     app_draw_text_centered(text_center_x,
                            center_y - ((7 * text_scale) / 2),
                            record,
@@ -391,10 +391,16 @@ void app_draw_menu_screen(const char *title, const char *item_name, const char *
 void app_draw_result_screen(const app_result_view_t *view)
 {
     int title_scale = fit_text_scale(view->game_name, 5, 3, LCD_WIDTH - 60);
+    int current_record_y = 102;
 
     app_fill_screen(COLOR_BLACK);
     app_draw_text_centered(LCD_WIDTH / 2, 28, view->game_name, title_scale, COLOR_WHITE);
-    app_draw_text_centered(LCD_WIDTH / 2, 102, view->current_record, 6, COLOR_WHITE);
+    if (view->record_label != NULL) {
+        int label_scale = fit_text_scale(view->record_label, 3, 2, LCD_WIDTH - 80);
+        app_draw_text_centered(LCD_WIDTH / 2, 76, view->record_label, label_scale, COLOR_WHITE);
+        current_record_y = 112;
+    }
+    app_draw_text_centered(LCD_WIDTH / 2, current_record_y, view->current_record, 6, COLOR_WHITE);
     draw_crowned_record_row(view->best_record, 196, 4, 12);
     draw_result_button(RESULT_CONTINUE_X, RESULT_BUTTON_Y,
                        RESULT_BUTTON_W, RESULT_BUTTON_H, POST_ACTION_REPLAY);

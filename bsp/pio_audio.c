@@ -37,6 +37,8 @@
 #include "pio_audio.pio.h"
 
 static uint audio_pio_offset = 0;
+static int32_t pack_stereo_sample(int16_t sample);
+static void finish_audio_output(void);
 static uint32_t audio_frame_time_us(void);
 
 /******************************************************************************
@@ -101,24 +103,33 @@ void audio_reset_output(void)
     pio_sm_put_blocking(pico_audio.pio_2, pico_audio.sm_dout, 0u);
 }
 
+static int32_t pack_stereo_sample(int16_t sample)
+{
+    uint16_t sample_bits = (uint16_t)sample;
+    return ((int32_t)sample_bits << 16) | sample_bits;
+}
+
 static uint32_t audio_frame_time_us(void)
 {
     return (1000000u + pico_audio.sample_freq - 1u) / pico_audio.sample_freq;
 }
 
-void audio_out_pcm16(const int16_t *samples, int32_t len)
+static void finish_audio_output(void)
 {
-    for (int32_t i = 0; i < len; i++) {
-        uint16_t sample_bits = (uint16_t)samples[i];
-        int32_t sample = ((int32_t)sample_bits << 16) | sample_bits;
-        pio_sm_put_blocking(pico_audio.pio_2, pico_audio.sm_dout, sample);
-    }
-
     pio_sm_put_blocking(pico_audio.pio_2, pico_audio.sm_dout, 0u);
     while (!pio_sm_is_tx_fifo_empty(pico_audio.pio_2, pico_audio.sm_dout)) {
         tight_loop_contents();
     }
     sleep_us(audio_frame_time_us() * 2u);
+}
+
+void audio_out_pcm16(const int16_t *samples, int32_t len)
+{
+    for (int32_t i = 0; i < len; i++) {
+        pio_sm_put_blocking(pico_audio.pio_2, pico_audio.sm_dout, pack_stereo_sample(samples[i]));
+    }
+
+    finish_audio_output();
 }
 
 /******************************************************************************

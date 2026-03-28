@@ -23,6 +23,7 @@ typedef enum {
 
 typedef struct {
     const char *game_name;
+    const char *record_label;
     const char *current_record;
     const char *best_record;
 } app_result_view_t;
@@ -31,6 +32,10 @@ void app_init(void);
 void app_fill_screen(uint16_t color);
 void app_present_frame(void);
 void app_draw_text_centered(int center_x, int y, const char *text, int scale, uint16_t color);
+void app_draw_bitmap_mask_centered(int center_x, int center_y,
+                                   int width, int height,
+                                   const char *const *rows,
+                                   uint16_t color);
 void app_draw_menu_screen(const char *title, const char *item_name, const char *best_record);
 void app_draw_result_screen(const app_result_view_t *view);
 void app_draw_black_message(const char *line1, const char *line2);
