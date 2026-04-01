@@ -1,10 +1,12 @@
 #include <stdio.h>
 #include "pico/stdlib.h"
 #include "app.h"
+#include "best_store.h"
 #include "assets/2_hit20/introduction_wav.h"
 #include "2_hit20.h"
 
 static uint32_t best_hundredths = 0;
+static bool best_loaded = false;
 static const int hit20_yo_i_width = 198;
 static const int hit20_yo_i_height = 64;
 static const char *const hit20_yo_i_rows[64] = {
@@ -73,6 +75,30 @@ static const char *const hit20_yo_i_rows[64] = {
     "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000111111111100000000000000000000",
     "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000111111111100000000000000000000",
 };
+
+static void hit20_load_best(void)
+{
+    uint32_t stored_value = 0;
+    bool has_value = false;
+
+    if (best_loaded) {
+        return;
+    }
+    if (!best_store_load_u32("HIT20", &stored_value, &has_value)) {
+        return;
+    }
+
+    if (has_value) {
+        best_hundredths = stored_value;
+    }
+    best_loaded = true;
+}
+
+static void hit20_save_best(void)
+{
+    best_loaded = true;
+    best_store_save_u32("HIT20", best_hundredths, best_hundredths != 0u);
+}
 static const int hit20_don_width = 168;
 static const int hit20_don_height = 63;
 static const char *const hit20_don_rows[63] = {
@@ -148,7 +174,7 @@ static void hit20_draw_start_text(int width, int height, const char *const *rows
     app_present_frame();
 }
 
-static void hit20_show_start_count_in(void)
+void hit20_show_start_count_in(void)
 {
     hit20_draw_start_text(hit20_yo_i_width, hit20_yo_i_height, hit20_yo_i_rows);
     sleep_ms(700);
@@ -158,6 +184,8 @@ static void hit20_show_start_count_in(void)
 
 void game_2_hit20_get_best_record(char *buffer, size_t buffer_size)
 {
+    hit20_load_best();
+
     if (best_hundredths == 0) {
         snprintf(buffer, buffer_size, "--.--");
         return;
@@ -168,6 +196,8 @@ void game_2_hit20_get_best_record(char *buffer, size_t buffer_size)
 
 void run_game_2_hit20(game_run_context_t *context)
 {
+    hit20_load_best();
+
     while (true) {
         bool is_first_start = game_consume_first_start(context);
         int remaining = 20;
@@ -206,7 +236,12 @@ void run_game_2_hit20(game_run_context_t *context)
 
         int64_t elapsed_us = absolute_time_diff_us(start_time, finish_time);
         uint32_t hundredths = (uint32_t)((elapsed_us + 5000) / 10000);
+        uint32_t previous_best = best_hundredths;
+
         app_update_best_hundredths(hundredths, &best_hundredths);
+        if (best_hundredths != previous_best) {
+            hit20_save_best();
+        }
         app_format_hundredths(result_text, sizeof(result_text), hundredths);
         app_format_hundredths(best_text, sizeof(best_text), best_hundredths);
         result_view.game_name = context->game_name;

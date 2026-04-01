@@ -49,12 +49,16 @@ static const glyph_t k_font[] = {
     {'8', {0x0E, 0x11, 0x11, 0x0E, 0x11, 0x11, 0x0E}},
     {'9', {0x0E, 0x11, 0x11, 0x0F, 0x01, 0x02, 0x1C}},
     {'A', {0x0E, 0x11, 0x11, 0x1F, 0x11, 0x11, 0x11}},
+    {'B', {0x1E, 0x11, 0x11, 0x1E, 0x11, 0x11, 0x1E}},
     {'C', {0x0E, 0x11, 0x10, 0x10, 0x10, 0x11, 0x0E}},
+    {'D', {0x1E, 0x11, 0x11, 0x11, 0x11, 0x11, 0x1E}},
     {'E', {0x1F, 0x10, 0x10, 0x1E, 0x10, 0x10, 0x1F}},
     {'F', {0x1F, 0x10, 0x10, 0x1E, 0x10, 0x10, 0x10}},
     {'G', {0x0E, 0x11, 0x10, 0x17, 0x11, 0x11, 0x0E}},
     {'H', {0x11, 0x11, 0x11, 0x1F, 0x11, 0x11, 0x11}},
     {'I', {0x0E, 0x04, 0x04, 0x04, 0x04, 0x04, 0x0E}},
+    {'J', {0x01, 0x01, 0x01, 0x01, 0x11, 0x11, 0x0E}},
+    {'K', {0x11, 0x12, 0x14, 0x18, 0x14, 0x12, 0x11}},
     {'L', {0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x1F}},
     {'M', {0x11, 0x1B, 0x15, 0x15, 0x11, 0x11, 0x11}},
     {'N', {0x11, 0x19, 0x15, 0x13, 0x11, 0x11, 0x11}},
@@ -64,7 +68,10 @@ static const glyph_t k_font[] = {
     {'S', {0x0F, 0x10, 0x10, 0x0E, 0x01, 0x01, 0x1E}},
     {'T', {0x1F, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04}},
     {'U', {0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0E}},
+    {'V', {0x11, 0x11, 0x11, 0x11, 0x11, 0x0A, 0x04}},
     {'W', {0x11, 0x11, 0x11, 0x15, 0x15, 0x15, 0x0A}},
+    {'X', {0x11, 0x11, 0x0A, 0x04, 0x0A, 0x11, 0x11}},
+    {'Z', {0x1F, 0x01, 0x02, 0x04, 0x08, 0x10, 0x1F}},
 };
 
 static const bsp_display_area_t full_area = {
@@ -76,6 +83,40 @@ static const bsp_display_area_t full_area = {
 
 static bsp_display_interface_t *display = NULL;
 static bsp_touch_interface_t *touch = NULL;
+
+static void recover_audio_hardware(bool first_init)
+{
+    gpio_init(PA_CTRL);
+    gpio_set_dir(PA_CTRL, GPIO_OUT);
+    gpio_put(PA_CTRL, 1);
+
+    if (first_init) {
+        mclk_pio_init();
+        dout_pio_init();
+    } else {
+        set_mclk_frequency(pico_audio.mclk_freq);
+        audio_reset_output();
+    }
+
+    sleep_ms(20);
+    bsp_i2c_init();
+
+    // A mid-playback power cut can leave the codec rails and analog block in an
+    // undefined state for a short time. Re-applying the full init sequence
+    // after the clocks have been running for a moment is more stable than
+    // changing the playback-time path.
+    es8311_init(pico_audio);
+    es8311_sample_frequency_config(pico_audio.mclk_freq, pico_audio.sample_freq);
+    es8311_voice_volume_set(pico_audio.volume);
+    es8311_voice_mute(false);
+
+    sleep_ms(20);
+
+    es8311_init(pico_audio);
+    es8311_sample_frequency_config(pico_audio.mclk_freq, pico_audio.sample_freq);
+    es8311_voice_volume_set(pico_audio.volume);
+    es8311_voice_mute(false);
+}
 
 static bool prepare_audio_playback(void)
 {
@@ -250,16 +291,7 @@ static void init_audio(void)
         return;
     }
 
-    gpio_init(PA_CTRL);
-    gpio_set_dir(PA_CTRL, GPIO_OUT);
-    gpio_put(PA_CTRL, 1);
-
-    mclk_pio_init();
-    dout_pio_init();
-    es8311_init(pico_audio);
-    es8311_sample_frequency_config(pico_audio.mclk_freq, pico_audio.sample_freq);
-    es8311_voice_volume_set(pico_audio.volume);
-    es8311_voice_mute(false);
+    recover_audio_hardware(true);
     audio_ready = true;
 }
 
@@ -298,10 +330,51 @@ void app_init(void)
     init_audio();
 }
 
+void app_restore_ui_peripherals(void)
+{
+    bsp_i2c_init();
+
+    if (display != NULL) {
+        display->init();
+    }
+    if (touch != NULL) {
+        touch->init();
+    }
+
+    previous_touched = false;
+}
+
+void app_restore_audio_peripherals(void)
+{
+    if (!audio_ready) {
+        return;
+    }
+
+    recover_audio_hardware(false);
+}
+
 void app_fill_screen(uint16_t color)
 {
     for (size_t i = 0; i < ARRAY_SIZE(framebuffer); ++i) {
         framebuffer[i] = color;
+    }
+}
+
+void app_fill_rect(int x, int y, int w, int h, uint16_t color)
+{
+    draw_rect(x, y, w, h, color);
+}
+
+void app_draw_filled_circle(int center_x, int center_y, int radius, uint16_t color)
+{
+    int radius_sq = radius * radius;
+
+    for (int dy = -radius; dy <= radius; ++dy) {
+        for (int dx = -radius; dx <= radius; ++dx) {
+            if ((dx * dx) + (dy * dy) <= radius_sq) {
+                set_pixel(center_x + dx, center_y + dy, color);
+            }
+        }
     }
 }
 
@@ -435,6 +508,22 @@ bool app_poll_touch_event(touch_event_t *event)
         event->y = data.coords[0].y;
     }
     return edge;
+}
+
+bool app_read_touch_state(touch_event_t *event)
+{
+    bsp_touch_data_t data;
+
+    touch->read();
+    if (!touch->get_data(&data)) {
+        return false;
+    }
+
+    if (event != NULL) {
+        event->x = data.coords[0].x;
+        event->y = data.coords[0].y;
+    }
+    return true;
 }
 
 void app_wait_for_touch_release(void)

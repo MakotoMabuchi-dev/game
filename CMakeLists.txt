@@ -30,18 +30,30 @@ project(test C CXX ASM)
 # Initialise the Raspberry Pi Pico SDK
 pico_sdk_init()
 
+add_subdirectory(vendor/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico/src)
+
 # Add executable. Default name is the project name, version 0.1
 
 add_executable(test
+        best_store.c
+        sd_hw_config.c
         app.c
         launcher.c
         games/games.c
         games/1_push_fast/1_push_fast.c
         games/2_hit20/2_hit20.c
+        games/3_TETRIS/3_TETRIS.c
+        games/4_ring8/4_ring8.c
+        games/5_ninja/5_ninja.c
+        games/6_jump/6_jump.c
+        games/7_block/7_block.c
+        games/8_invader/8_invader.c
+        games/9_pinball/9_pinball.c
         bsp/bsp_dma_channel_irq.c
         bsp/bsp_cst816.c
         bsp/bsp_es8311.c
         bsp/bsp_i2c.c
+        bsp/bsp_qmi8658.c
         bsp/bsp_st77916.c
         bsp/pio_audio.c
         bsp/pio_qspi.c
@@ -56,6 +68,7 @@ pico_enable_stdio_usb(test 1)
 
 # Add the standard library to the build
 target_link_libraries(test
+        no-OS-FatFS-SD-SDIO-SPI-RPi-Pico
         pico_stdlib
         hardware_dma
         hardware_i2c

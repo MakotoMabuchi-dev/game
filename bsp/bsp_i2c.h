@@ -9,6 +9,8 @@
 #define BSP_I2C_SDA_PIN 6
 #define BSP_I2C_SCL_PIN 7
 
+bool bsp_i2c_probe(uint8_t device_addr);
+size_t bsp_i2c_scan(uint8_t *addresses, size_t max_addresses);
 void bsp_i2c_write(uint8_t device_addr, uint8_t *buffer, size_t len);
 void bsp_i2c_write_reg8(uint8_t device_addr, uint8_t reg_addr, uint8_t *buffer, size_t len);
 void bsp_i2c_read_reg8(uint8_t device_addr, uint8_t reg_addr, uint8_t *buffer, size_t len);

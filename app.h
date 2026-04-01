@@ -29,7 +29,11 @@ typedef struct {
 } app_result_view_t;
 
 void app_init(void);
+void app_restore_ui_peripherals(void);
+void app_restore_audio_peripherals(void);
 void app_fill_screen(uint16_t color);
+void app_fill_rect(int x, int y, int w, int h, uint16_t color);
+void app_draw_filled_circle(int center_x, int center_y, int radius, uint16_t color);
 void app_present_frame(void);
 void app_draw_text_centered(int center_x, int y, const char *text, int scale, uint16_t color);
 void app_draw_bitmap_mask_centered(int center_x, int center_y,
@@ -40,6 +44,7 @@ void app_draw_menu_screen(const char *title, const char *item_name, const char *
 void app_draw_result_screen(const app_result_view_t *view);
 void app_draw_black_message(const char *line1, const char *line2);
 bool app_poll_touch_event(touch_event_t *event);
+bool app_read_touch_state(touch_event_t *event);
 void app_wait_for_touch_release(void);
 bool app_is_left_edge_touch(uint16_t x);
 bool app_is_right_edge_touch(uint16_t x);

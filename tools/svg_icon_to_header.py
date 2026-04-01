@@ -6,8 +6,6 @@ import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from PIL import Image, ImageDraw
-
 TOKEN_RE = re.compile(r"[MmZzLlHhVvCcSs]|[-+]?(?:\d*\.\d+|\d+)(?:[eE][-+]?\d+)?")
 
 
@@ -54,10 +52,7 @@ def parse_path(d):
         if command in ("M", "m"):
             x = read_float()
             y = read_float()
-            if command == "m":
-                current = (current[0] + x, current[1] + y)
-            else:
-                current = (x, y)
+            current = (current[0] + x, current[1] + y) if command == "m" else (x, y)
             start = current
             if path:
                 subpaths.append(path)
@@ -69,10 +64,7 @@ def parse_path(d):
             while i < len(tokens) and not re.fullmatch(r"[A-Za-z]", tokens[i]):
                 x = read_float()
                 y = read_float()
-                if command == "l":
-                    current = (current[0] + x, current[1] + y)
-                else:
-                    current = (x, y)
+                current = (current[0] + x, current[1] + y) if command == "l" else (x, y)
                 path.append(current)
             last_control = None
         elif command in ("H", "h"):
@@ -144,13 +136,29 @@ def parse_path(d):
     return subpaths
 
 
+def point_in_polygon(x, y, polygon):
+    inside = False
+    j = len(polygon) - 1
+
+    for i in range(len(polygon)):
+        xi, yi = polygon[i]
+        xj, yj = polygon[j]
+        intersects = ((yi > y) != (yj > y))
+        if intersects:
+            cross_x = ((xj - xi) * (y - yi) / (yj - yi)) + xi
+            if x < cross_x:
+                inside = not inside
+        j = i
+
+    return inside
+
+
 def render_svg(svg_path, size):
     root = ET.parse(svg_path).getroot()
     view_box = root.attrib.get("viewBox", "0 0 24 24").split()
     min_x, min_y, width, height = [float(v) for v in view_box]
     upscale = size * 4
-    img = Image.new("L", (upscale, upscale), 0)
-    draw = ImageDraw.Draw(img)
+    mask = [[0 for _ in range(upscale)] for _ in range(upscale)]
 
     for path_node in root.findall(".//{http://www.w3.org/2000/svg}path"):
         if path_node.attrib.get("fill") == "none":
@@ -161,45 +169,66 @@ def render_svg(svg_path, size):
                 px = ((x - min_x) / width) * (upscale - 1)
                 py = ((y - min_y) / height) * (upscale - 1)
                 scaled.append((px, py))
-            if len(scaled) >= 3:
-                draw.polygon(scaled, fill=255)
+            if len(scaled) < 3:
+                continue
 
-    img = img.resize((size, size), Image.Resampling.LANCZOS)
-    img = img.point(lambda p: 255 if p >= 96 else 0)
-    return img
+            min_px = max(0, int(math.floor(min(x for x, _ in scaled))))
+            max_px = min(upscale - 1, int(math.ceil(max(x for x, _ in scaled))))
+            min_py = max(0, int(math.floor(min(y for _, y in scaled))))
+            max_py = min(upscale - 1, int(math.ceil(max(y for _, y in scaled))))
+
+            for py in range(min_py, max_py + 1):
+                sample_y = py + 0.5
+                for px in range(min_px, max_px + 1):
+                    if point_in_polygon(px + 0.5, sample_y, scaled):
+                        mask[py][px] = 1
+
+    rows = []
+    for y in range(size):
+        row = []
+        for x in range(size):
+            filled = 0
+            for sy in range(y * 4, (y + 1) * 4):
+                for sx in range(x * 4, (x + 1) * 4):
+                    filled += mask[sy][sx]
+            row.append("1" if filled >= 4 else "0")
+        rows.append("".join(row))
+
+    return size, size, rows
 
 
 def emit_bitmap(name, image):
-    pixels = image.load()
-    width, height = image.size
-    rows = []
-    for y in range(height):
-        row = []
-        for x in range(width):
-            row.append("1" if pixels[x, y] else "0")
-        rows.append("    \"" + "".join(row) + "\"")
+    width, height, rows = image
+    emitted_rows = ['    "' + row + '"' for row in rows]
 
     return "\n".join([
         f"static const int {name}_width = {width};",
         f"static const int {name}_height = {height};",
         f"static const char *const {name}_rows[{height}] = {{",
-        ",\n".join(rows),
+        ",\n".join(emitted_rows),
         "};",
     ])
 
 
 def main():
     out_path = Path(sys.argv[1])
-    icons = [
-        ("continue_replay_icon", Path(sys.argv[2]), 48),
-        ("finish_logout_icon", Path(sys.argv[3]), 48),
-        ("best_crown_icon", Path(sys.argv[4]), 24),
-    ]
+    guard = re.sub(r"[^A-Z0-9]+", "_", out_path.stem.upper()) + "_H"
+    if len(sys.argv) == 5:
+        icons = [
+            ("continue_replay_icon", Path(sys.argv[2]), 48),
+            ("finish_logout_icon", Path(sys.argv[3]), 48),
+            ("best_crown_icon", Path(sys.argv[4]), 24),
+        ]
+    else:
+        icons = []
+        for spec in sys.argv[2:]:
+            name, size, path = spec.split(":", 2)
+            icons.append((name, Path(path), int(size)))
 
     rendered = [(name, render_svg(path, size)) for name, path, size in icons]
     parts = [
-        "#ifndef UI_RESULT_ICONS_H",
-        "#define UI_RESULT_ICONS_H",
+        f"#ifndef {guard}",
+        f"#define {guard}",
         "",
     ]
     for name, image in rendered:

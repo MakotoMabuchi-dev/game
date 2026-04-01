@@ -1,13 +1,41 @@
 #include <stdio.h>
 #include "pico/stdlib.h"
 #include "app.h"
+#include "best_store.h"
 #include "assets/1_push_fast/1_push_fast_wav.h"
 #include "1_push_fast.h"
 
 static uint32_t best_hundredths = 0;
+static bool best_loaded = false;
+
+static void push_fast_load_best(void)
+{
+    uint32_t stored_value = 0;
+    bool has_value = false;
+
+    if (best_loaded) {
+        return;
+    }
+    if (!best_store_load_u32("FAST", &stored_value, &has_value)) {
+        return;
+    }
+
+    if (has_value) {
+        best_hundredths = stored_value;
+    }
+    best_loaded = true;
+}
+
+static void push_fast_save_best(void)
+{
+    best_loaded = true;
+    best_store_save_u32("FAST", best_hundredths, best_hundredths != 0u);
+}
 
 void game_1_push_fast_get_best_record(char *buffer, size_t buffer_size)
 {
+    push_fast_load_best();
+
     if (best_hundredths == 0) {
         snprintf(buffer, buffer_size, "--.--");
         return;
@@ -18,6 +46,8 @@ void game_1_push_fast_get_best_record(char *buffer, size_t buffer_size)
 
 void run_game_1_push_fast(game_run_context_t *context)
 {
+    push_fast_load_best();
+
     while (true) {
         bool is_first_start = game_consume_first_start(context);
         bool is_reference_record = false;
@@ -70,7 +100,12 @@ void run_game_1_push_fast(game_run_context_t *context)
                 int64_t reaction_us = absolute_time_diff_us(red_time, get_absolute_time());
                 uint32_t hundredths = (uint32_t)((reaction_us + 5000) / 10000);
                 if (!is_reference_record) {
+                    uint32_t previous_best = best_hundredths;
+
                     app_update_best_hundredths(hundredths, &best_hundredths);
+                    if (best_hundredths != previous_best) {
+                        push_fast_save_best();
+                    }
                 }
                 app_format_hundredths(result_text, sizeof(result_text), hundredths);
                 if (best_hundredths == 0) {
